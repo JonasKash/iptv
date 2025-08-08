@@ -79,9 +79,6 @@ if (!String.prototype.trim) {
     }
     var uniqueId = {};
 
-    let gtm_variables = {};
-    let gtm_datalayername = "dynamicVariable";
-
     var domain = '';
     if(options.hasOwnProperty("track_cookie_for_subdomains") && options.track_cookie_for_subdomains) {
         domain = getRootDomain(true);
@@ -183,16 +180,8 @@ if (!String.prototype.trim) {
 
             if (!options.gdpr.all_disabled_by_api) {
 
-                if (!options.gdpr.facebook_disabled_by_api) {
-                    Facebook.loadPixel();
-                }
-
                 if (!options.gdpr.analytics_disabled_by_api) {
                     Analytics.loadPixel();
-                }
-
-                if (!options.gdpr.analytics_disabled_by_api) {
-                    GTM.loadPixel();
                 }
 
                 if (!options.gdpr.pinterest_disabled_by_api) {
@@ -398,17 +387,12 @@ if (!String.prototype.trim) {
             utmTerms : utmTerms,
             utmId : utmId,
             fireEventForAllPixel:function(functionName,events){
-                if (events.hasOwnProperty(Facebook.tag()))
-                    Facebook[functionName](events[Facebook.tag()]);
                 if (events.hasOwnProperty(Analytics.tag()))
                     Analytics[functionName](events[Analytics.tag()]);
                 if (events.hasOwnProperty(Pinterest.tag()))
                     Pinterest[functionName](events[Pinterest.tag()]);
                 if (events.hasOwnProperty(Bing.tag()))
                     Bing[functionName](events[Bing.tag()]);
-
-                if (events.hasOwnProperty(GTM.tag()))
-                    GTM[functionName](events[GTM.tag()]);
             },
 
             setupPinterestObject: function () {
@@ -487,35 +471,7 @@ if (!String.prototype.trim) {
                         }
                     });
                 }
-                if (options.ajaxForServerEvent && !Cookies.get('pbid') && Facebook.isEnabled()) {
-                     jQuery.ajax({
-                        url: options.ajaxUrl,
-                        dataType: 'json',
-                        data: {
-                            action: 'pys_get_pbid'
-                        },
-                        success: function (res) {
-                            if (res.data && res.data.pbid != false && options.send_external_id) {
-                                if(!(options.cookie.disabled_all_cookie || options.cookie.externalID_disabled_by_api)){
-                                    var expires = parseInt(options.external_id_expire || 180);
-                                    Cookies.set('pbid', res.data.pbid, { expires: expires, path: '/',domain: domain });
-                                }
 
-                                if(options.hasOwnProperty('facebook')) {
-                                    options.facebook.advancedMatching = {
-                                        ...options.facebook.advancedMatching,  // распыляем текущие значения advancedMatching
-                                        external_id: res.data.pbid
-                                    };
-                                }
-                            }
-                        }
-                    });
-                } else if (Cookies.get('pbid') && Facebook.isEnabled()){
-                    if(Facebook.advancedMatching() && Facebook.advancedMatching().external_id && !(options.cookie.disabled_all_cookie || options.cookie.externalID_disabled_by_api)){
-                        let expires = parseInt(options.external_id_expire || 180);
-                        Cookies.set('pbid', Facebook.advancedMatching().external_id, { expires: expires, path: '/',domain: domain });
-                    }
-                }
 
                 let expires = parseInt(options.cookie_duration); //  days
                 let queryVars = getQueryVars();
@@ -865,10 +821,7 @@ if (!String.prototype.trim) {
                 var event = {};
                 var events = options.triggerEvents[eventId];
 
-                if (events.hasOwnProperty('facebook')) {
-                    event = events.facebook;
-                    Facebook.fireEvent(event.name, event);
-                }
+
 
                 if (events.hasOwnProperty('ga')) {
                     event = events.ga;
@@ -885,10 +838,7 @@ if (!String.prototype.trim) {
                     Bing.fireEvent(event.name, event);
                 }
 
-                if (events.hasOwnProperty('gtm')) {
-                    event = events.gtm;
-                    GTM.fireEvent(event.name, event);
-                }
+
             },
 
             fireStaticEvents: function (pixel) {
@@ -905,16 +855,12 @@ if (!String.prototype.trim) {
                                 var fired = false;
 
                                 // fire event
-                                if ('facebook' === pixel) {
-                                    fired = Facebook.fireEvent(eventData.name, eventData);
-                                } else if ('ga' === pixel) {
+                                if ('ga' === pixel) {
                                     fired = Analytics.fireEvent(eventData.name, eventData);
                                 } else if ('pinterest' === pixel) {
                                     fired = Pinterest.fireEvent(eventData.name, eventData);
                                 } else if ('bing' === pixel) {
                                     fired = Bing.fireEvent(eventData.name, eventData);
-                                } else if ('gtm' === pixel) {
-                                    fired = GTM.fireEvent(eventData.name, eventData);
                                 }
 
                                 // prevent event double event firing
@@ -986,48 +932,7 @@ if (!String.prototype.trim) {
                 window[ this.dataLayerName ].push( arguments );
             },
 
-            loadGTMScript: function (id) {
-                const domain = options.gtm.gtm_container_domain ?? 'www.googletagmanager.com';
-                const loader = options.gtm.gtm_container_identifier ?? 'gtm';
-                const gtm_auth = options.gtm.gtm_auth ?? ''; // Set this if needed
-                const gtm_preview = options.gtm.gtm_preview ?? ''; // Set this if needed
-                const datalayer_name = options.gtm.gtm_dataLayer_name ?? 'dataLayer';
 
-                window[ datalayer_name ] = window[ datalayer_name ] || [];
-                window.gtag = window.gtag || function gtag() {
-                    window[ datalayer_name ].push( arguments );
-                };
-
-                if ( options.google_consent_mode ) {
-                    let data = {};
-                    data[ 'analytics_storage' ] = options.gdpr.analytics_storage.enabled ? options.gdpr.analytics_storage.value : 'granted';
-                    data[ 'ad_storage' ] = options.gdpr.ad_storage.enabled ? options.gdpr.ad_storage.value : 'granted';
-                    data[ 'ad_user_data' ] = options.gdpr.ad_user_data.enabled ? options.gdpr.ad_user_data.value : 'granted';
-                    data[ 'ad_personalization' ] = options.gdpr.ad_personalization.enabled ? options.gdpr.ad_personalization.value : 'granted';
-
-                    this.GTMdataLayerName = datalayer_name;
-                    this.loadDefaultGTMConsent( 'consent', 'default', data );
-                }
-
-                (function(w, d, s, l, i) {
-                    w[l] = w[l] || [];
-                    w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
-                    const f = d.getElementsByTagName(s)[0];
-                    const j = d.createElement(s);
-                    const dl = l !== 'dataLayer' ? '&l=' + l : '';
-                    j.async = true;
-                    j.src = 'https://' + domain + '/' + loader + '.js?id=' + i + dl;
-                    if (gtm_auth && gtm_preview) {
-                        j.src += '&gtm_auth=' + gtm_auth + '&gtm_preview=' + gtm_preview + '&gtm_cookies_win=x';
-                    }
-                    f.parentNode.insertBefore(j, f);
-                })(window, document, 'script', datalayer_name, id);
-
-            },
-
-            loadDefaultGTMConsent: function() {
-                window[ this.GTMdataLayerName ].push( arguments );
-            },
 
             /**
              * GDPR
@@ -1146,8 +1051,6 @@ if (!String.prototype.trim) {
                         switch (pixel) {
                             case "analytics":
                                 return consentApi.consentSync("http", "_ga", "*").cookieOptIn;
-                            case "facebook":
-                                return consentApi.consentSync("http", "_fbp", "*").cookieOptIn;
                             case "pinterest":
                                 return consentApi.consentSync("http", "_pinterest_sess", ".pinterest.com").cookieOptIn;
                             default:
@@ -1249,13 +1152,11 @@ if (!String.prototype.trim) {
                         let theCookies = document.cookie.split( ';' );
 
                         let consent = {
-                            facebook: true,
                             ga: true,
                             google_ads: true,
                             tiktok: true,
                             bing: true,
                             pinterest: true,
-                            gtm: true,
                         };
 
                         for (let i = 1 ; i <= theCookies.length; i++) {
@@ -1264,10 +1165,6 @@ if (!String.prototype.trim) {
                                 categoryCookie = Number(categoryCookie.replace(/\D+/g,""));
                                 let cs_cookie_val = Cookies.get('cs_enabled_cookie_term'+test_prefix+'_'+categoryCookie);
                                 if(cs_cookie_val == 'yes') {
-                                    if ( ( categoryCookie === CS_Data.cs_script_cat.facebook ) || ( typeof CS_Data.cs_meta_ldu_mode !== "undefined" && CS_Data.cs_meta_ldu_mode ) ) {
-                                        Facebook.loadPixel();
-                                    }
-
                                     if (categoryCookie === CS_Data.cs_script_cat.bing) {
                                         Bing.loadPixel();
                                     }
@@ -1281,11 +1178,6 @@ if (!String.prototype.trim) {
                                         Pinterest.loadPixel();
                                     }
                                 } else {
-                                    if ( ( categoryCookie === CS_Data.cs_script_cat.facebook ) && ( typeof CS_Data.cs_meta_ldu_mode == "undefined" || !CS_Data.cs_meta_ldu_mode ) ) {
-                                        Facebook.disable();
-                                        consent.facebook = false;
-                                    }
-
                                     if (categoryCookie === CS_Data.cs_script_cat.bing) {
                                         Bing.disable();
                                         consent.bing = false;
@@ -1293,16 +1185,12 @@ if (!String.prototype.trim) {
                                     if (categoryCookie === CS_Data.cs_script_cat.analytics && (typeof CS_Data.cs_google_analytics_consent_mode == "undefined" || CS_Data.cs_google_analytics_consent_mode == 0)) {
                                         Analytics.disable();
                                         consent.ga = false;
-                                        consent.gtm = false;
                                     }
 
                                     if (categoryCookie === CS_Data.cs_script_cat.pinterest) {
                                         Pinterest.disable();
                                         consent.pinterest = false;
                                     }
-                                }
-                                if (Cookies.get('cs_enabled_advanced_matching') == 'yes') {
-                                    Facebook.loadPixel();
                                 }
                             }
                         }
@@ -1316,40 +1204,32 @@ if (!String.prototype.trim) {
                             e.preventDefault();
 
                             let consent = {
-                                facebook: true,
                                 ga: true,
                                 bing: true,
                                 pinterest: true,
-                                gtm: true,
                             };
 
                             let elm = $(this),
                                 button_action = elm.attr('data-cs_action');
 
                             if(button_action === 'allow_all') {
-                                Facebook.loadPixel();
                                 Bing.loadPixel();
                                 Analytics.loadPixel();
                                 Pinterest.loadPixel();
 
-                                consent.facebook = true;
                                 consent.bing = true;
                                 consent.ga = true;
                                 consent.pinterest = true;
-                                consent.gtm = true;
 
                                 Utils.setupGDPRData( consent );
                             } else if(button_action === 'disable_all') {
-                                Facebook.disable();
                                 Bing.disable();
                                 if(CS_Data.cs_google_analytics_consent_mode == 0 || typeof CS_Data.cs_google_analytics_consent_mode == "undefined") {
                                     Analytics.disable();
                                     consent.ga = false;
-                                    consent.gtm = false;
                                 }
                                 Pinterest.disable();
 
-                                consent.facebook = false;
                                 consent.bing = false;
                                 consent.pinterest = false;
                                 Utils.setupGDPRData( consent );
@@ -1367,27 +1247,19 @@ if (!String.prototype.trim) {
                     if (consentApi) {
                         consentApi.consent("http", "_ga", "*")
                             .then(Analytics.loadPixel.bind(Analytics), Analytics.disable.bind(Analytics));
-                        consentApi.consent("http", "_fbp", "*")
-                            .then(Facebook.loadPixel.bind(Facebook), Facebook.disable.bind(Facebook));
                         consentApi.consent("http", "_pinterest_sess", ".pinterest.com")
                             .then(Pinterest.loadPixel.bind(Pinterest), Pinterest.disable.bind(Pinterest));
                         consentApi.consent("http", "_uetsid", "*")
                             .then(Bing.loadPixel.bind(Bing), Bing.disable.bind(Bing));
 
                         let consent = {
-                            facebook: true,
                             ga: true,
                             bing: true,
                             pinterest: true,
-                            gtm: true,
                         };
 
                         if (!consentApi.consentSync("http", "_ga", "*").cookieOptIn) {
                             consent.ga = false;
-                            consent.gtm = false;
-                        }
-                        if (!consentApi.consentSync("http", "_fbp", "*").cookieOptIn) {
-                            consent.facebook = false;
                         }
                         if (!consentApi.consentSync("http", "_pinterest_sess", ".pinterest.com").cookieOptIn) {
                             consent.pinterest = false;
@@ -1406,20 +1278,16 @@ if (!String.prototype.trim) {
                     window.addEventListener("CookiebotOnConsentReady", function() {
 
                         let consent = {
-                            facebook: true,
                             ga: true,
                             bing: true,
                             pinterest: true,
-                            gtm: true,
                         };
 
                         Utils.manageCookies();
                         if (Cookiebot.consent.marketing) {
-                            Facebook.loadPixel();
                             Bing.loadPixel();
                             Pinterest.loadPixel();
 
-                            consent.facebook = true;
                             consent.bing = true;
                             consent.pinterest = true;
                         }
@@ -1427,14 +1295,11 @@ if (!String.prototype.trim) {
                             Analytics.loadPixel();
 
                             consent.ga = true;
-                            consent.gtm = true;
                         }
                         if (!Cookiebot.consent.marketing) {
-                            Facebook.disable();
                             Pinterest.disable();
                             Bing.disable();
 
-                            consent.facebook = false;
                             consent.bing = false;
                             consent.pinterest = false;
                         }
@@ -1442,7 +1307,6 @@ if (!String.prototype.trim) {
                             Analytics.disable();
 
                             consent.ga = false;
-                            consent.gtm = false;
                         }
 
                         Utils.setupGDPRData( consent );
@@ -1460,30 +1324,24 @@ if (!String.prototype.trim) {
                         let consent = {};
 
                         if ($(this).data('cookie-set') === 'accept') {
-                            Facebook.loadPixel();
                             Analytics.loadPixel();
                             Pinterest.loadPixel();
                             Bing.loadPixel();
 
                             consent = {
-                                facebook: true,
                                 ga: true,
                                 bing: true,
                                 pinterest: true,
-                                gtm: true,
                             };
                         } else {
-                            Facebook.disable();
                             Analytics.disable();
                             Pinterest.disable();
                             Bing.disable();
 
                             consent = {
-                                facebook: false,
                                 ga: false,
                                 bing: false,
                                 pinterest: false,
-                                gtm: false,
                             };
                         }
 
@@ -1491,17 +1349,14 @@ if (!String.prototype.trim) {
                     });
 
                     $(document).onFirst('click', '.cn-revoke-cookie', function () {
-                        Facebook.disable();
                         Analytics.disable();
                         Pinterest.disable();
                         Bing.disable();
 
                         let consent = {
-                            facebook: false,
                             ga: false,
                             bing: false,
                             pinterest: false,
-                            gtm: false,
                         };
                         Utils.setupGDPRData( consent );
 
@@ -1525,33 +1380,27 @@ if (!String.prototype.trim) {
                                 }
                             }
                         },1000)
-                        Facebook.loadPixel();
                         Analytics.loadPixel();
                         Pinterest.loadPixel();
                         Bing.loadPixel();
 
                         let consent = {
-                            facebook: true,
                             ga: true,
                             bing: true,
                             pinterest: true,
-                            gtm: true,
                         };
                         Utils.setupGDPRData( consent );
                     });
 
                     $(document).onFirst('click', '#cookie_action_close_header_reject, .cky-btn-reject', function () {
-                        Facebook.disable();
                         Analytics.disable();
                         Pinterest.disable();
                         Bing.disable();
 
                         let consent = {
-                            facebook: false,
                             ga: false,
                             bing: false,
                             pinterest: false,
-                            gtm: false,
                         };
                         Utils.setupGDPRData( consent );
                     });
@@ -1686,7 +1535,7 @@ if (!String.prototype.trim) {
 
     }(options);
 
-    var Facebook = function (options) {
+
 
 
         var defaultEventTypes = [
@@ -2156,11 +2005,6 @@ if (!String.prototype.trim) {
                     data = Cookies.get("pys_fb_event_id");
                 }
                 return JSON.parse(data)[key];
-            },
-        };
-
-    }(options);
-
     var Analytics = function (options) {
 
         var initialized = false;
@@ -2500,7 +2344,7 @@ if (!String.prototype.trim) {
 
     }(options);
 
-    var GTM = function (options) {
+
         var initialized = false;
 
         var datalayer_name = 'dataLayer';
@@ -2869,14 +2713,8 @@ if (!String.prototype.trim) {
             onTime: function (event) {
                 this.fireEvent(event.name, event);
             },
-        };
-
-    }(options);
-
     window.pys = window.pys || {};
-    window.pys.Facebook = Facebook;
     window.pys.Analytics = Analytics;
-    window.pys.GTM = GTM;
     window.pys.Utils = Utils;
 
 
